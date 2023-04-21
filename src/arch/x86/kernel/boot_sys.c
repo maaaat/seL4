@@ -708,6 +708,71 @@ static BOOT_CODE bool_t try_boot_sys_mbi2(
     return true;
 }
 
+#ifdef CONFIG_PRINTING
+static BOOT_CODE void dump_machine_yml(void)
+{
+
+    printf("Here comes the machine.yml file:\n"
+           "---\n");
+
+    printf("# Physical memory regions.\nmemory:\n");
+    for (word_t i = 0; i < boot_state.mem_p_regs.count; i++) {
+	    printf("  - base: 0x%lx\n"
+	           "    size: 0x%lx\n",
+	           boot_state.mem_p_regs.list[i].start,
+	           boot_state.mem_p_regs.list[i].end - boot_state.mem_p_regs.list[i].start);
+    }
+
+    printf("\n"
+           "# Kernel devices.\n"
+           "kdevs:\n");
+
+    printf("  - name: apic\n"
+	   "    base: 0x%lx\n"
+	   "    size: 0x%x\n",
+           apic_get_base_paddr(), 0x1000);
+
+    for (word_t i = 0; i < boot_state.num_ioapic; i++) {
+	printf("  - name: ioapic.%lu\n"
+	       "    base: 0x%lx\n"
+	       "    size: 0x%x\n",
+	       i, boot_state.ioapic_paddr[i], 0x1000);
+    }
+
+    for (word_t i = 0; i < boot_state.num_drhu; i++) {
+	printf("  - name: drhu.%lu\n"
+	       "    base: 0x%lx\n"
+	       "    size: 0x%x\n",
+	       i, boot_state.drhu_list[i], 0x1000);
+    }
+
+    printf("\n"
+           "# VT-d RMRRs.\n"
+           "rmrrs:");
+
+    if (boot_state.rmrr_list.num == 0) {
+	    printf(" []\n");
+    } else {
+	    printf("\n");
+	    for (word_t i = 0; i < boot_state.rmrr_list.num; i++) {
+		    acpi_rmrr_entry_t *entry = &boot_state.rmrr_list.entries[i];
+		    printf("  - device: 0x%lx\n"
+		           "    base: 0x%x\n"
+		           "    limit: 0x%x\n",
+		           entry->device, entry->base, entry->limit);
+	    }
+    }
+
+    printf("\n"
+           "# Bootinfo data:\n"
+           "bootinfo:\n"
+           "  numIOPTLevels: %lu\n",
+           ndks_boot.bi_frame->numIOPTLevels);
+
+    printf("---\n");
+}
+#endif
+
 BOOT_CODE VISIBLE void boot_sys(
     unsigned long multiboot_magic,
     void *mbi)
@@ -725,6 +790,10 @@ BOOT_CODE VISIBLE void boot_sys(
     if (result) {
         result = try_boot_sys();
     }
+
+#ifdef CONFIG_PRINTING
+    dump_machine_yml();
+#endif
 
     if (!result) {
         fail("boot_sys failed for some reason :(\n");
